@@ -63,7 +63,13 @@ class DbalTransport implements TransportInterface, ListableReceiverInterface, Me
     public function createTable(): void
     {
         $this->connection->connect();
-        $schemaManager = $this->connection->createSchemaManager();
+        // DBAL 2.13 support
+        if (method_exists($this->connection, 'getSchemaManager') && !method_exists($this->connection, 'createSchemaManager')) {
+            $schemaManager = $this->connection->getSchemaManager();
+        } else {
+            // DBAL 3.1 deprecates getSchemaManager and says to use createSchemaManager instead.
+            $schemaManager = $this->connection->createSchemaManager();
+        }
 
         $schema = $schemaManager->createSchema();
         if ($schema->hasTable($this->options['table_name'])) {

@@ -8,6 +8,7 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Query\Expression\ExpressionBuilder;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Result;
+use Doctrine\DBAL\ForwardCompatibility\Result as ForwardCompatibileResult;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Schema\Table;
@@ -63,6 +64,12 @@ class DbalTransportTest extends TestCase
 
     public function testSend(): void
     {
+        if (method_exists(Connection::class, 'getExpressionBuilder') && !method_exists(Connection::class, 'createExpressionBuilder')) {
+            $expressionBuilderMethodName = 'getExpressionBuilder';
+        } else {
+            $expressionBuilderMethodName = 'createExpressionBuilder';
+        }
+
         $message = new class() implements DelayedMessageInterface, TTLAwareMessageInterface, UniqueMessageInterface {
             public function getDelay(): int
             {
@@ -82,7 +89,7 @@ class DbalTransportTest extends TestCase
 
         $this->connection->getDatabasePlatform()->willReturn($this->prophesize(AbstractPlatform::class));
         $this->connection->createQueryBuilder()->willReturn(new QueryBuilder($this->connection->reveal()));
-        $this->connection->createExpressionBuilder()->willReturn(new ExpressionBuilder($this->connection->reveal()));
+        $this->connection->$expressionBuilderMethodName()->willReturn(new ExpressionBuilder($this->connection->reveal()));
 
         $this->connection
             ->executeQuery('SELECT id FROM messenger WHERE (uniq_key = :uniq_key) AND (delivery_id IS NULL)', ['uniq_key' => 'uniq'], [])
@@ -123,6 +130,12 @@ class DbalTransportTest extends TestCase
 
     public function testSendShouldNotSendIfUniqueMessageIsInQueue(): void
     {
+        if (method_exists(Connection::class, 'getExpressionBuilder') && !method_exists(Connection::class, 'createExpressionBuilder')) {
+            $expressionBuilderMethodName = 'getExpressionBuilder';
+        } else {
+            $expressionBuilderMethodName = 'createExpressionBuilder';
+        }
+
         $message = new class() implements UniqueMessageInterface {
             public function getUniquenessKey(): string
             {
@@ -132,7 +145,7 @@ class DbalTransportTest extends TestCase
 
         $this->connection->getDatabasePlatform()->willReturn($this->prophesize(AbstractPlatform::class));
         $this->connection->createQueryBuilder()->willReturn(new QueryBuilder($this->connection->reveal()));
-        $this->connection->createExpressionBuilder()->willReturn(new ExpressionBuilder($this->connection->reveal()));
+        $this->connection->$expressionBuilderMethodName()->willReturn(new ExpressionBuilder($this->connection->reveal()));
 
         $this->connection
             ->executeQuery('SELECT id FROM messenger WHERE (uniq_key = :uniq_key) AND (delivery_id IS NULL)', ['uniq_key' => 'uniq'], [])
@@ -146,8 +159,14 @@ class DbalTransportTest extends TestCase
 
     public function testCreateTable(): void
     {
+        if (method_exists(Connection::class, 'getSchemaManager') && !method_exists(Connection::class, 'createSchemaManager')) {
+            $schemaManagerMethodName = 'getSchemaManager';
+        } else {
+            $schemaManagerMethodName = 'createSchemaManager';
+        }
+
         $this->connection->connect()->willReturn();
-        $this->connection->createSchemaManager()
+        $this->connection->$schemaManagerMethodName()
             ->willReturn($schemaManager = $this->prophesize(AbstractSchemaManager::class));
 
         $schemaManager->createSchema()->willReturn(new Schema());
@@ -261,6 +280,10 @@ class DbalTransportTest extends TestCase
 
     private function createResultObject(array $data): object
     {
+        if (class_exists(ForwardCompatibileResult::class)) {
+            return new ForwardCompatibileResult(new DummyStatement($data));
+        }
+
         return new Result(new DummyResult($data), $this->connection->reveal());
     }
 }

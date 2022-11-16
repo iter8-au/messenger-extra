@@ -88,6 +88,12 @@ class DbalTransportFactoryTest extends TestCase
 
     public function testCreateShouldHandleSqlitePathsCorrectly(): void
     {
+        if (method_exists(Connection::class, 'getSchemaManager') && !method_exists(Connection::class, 'createSchemaManager')) {
+            $schemaManagerMethodName = 'getSchemaManager';
+        } else {
+            $schemaManagerMethodName = 'createSchemaManager';
+        }
+
         @\unlink(__DIR__.'/queue.db');
 
         $this->managerRegistry->getConnection(Argument::any())
@@ -99,7 +105,7 @@ class DbalTransportFactoryTest extends TestCase
         $transport->createTable();
 
         $connection = DriverManager::getConnection(['url' => 'sqlite:///'.__DIR__.'/queue.db']);
-        $schemaManager = $connection->createSchemaManager();
+        $schemaManager = $connection->$schemaManagerMethodName();
 
         $schema = $schemaManager->createSchema();
         self::assertTrue($schema->hasTable('table_name'));

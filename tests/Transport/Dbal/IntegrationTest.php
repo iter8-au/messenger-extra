@@ -10,6 +10,7 @@ use Kcs\MessengerExtra\Tests\Fixtures\UniqueDummyMessage;
 use Kcs\MessengerExtra\Transport\Dbal\DbalTransport;
 use Kcs\MessengerExtra\Transport\Dbal\DbalTransportFactory;
 use PHPUnit\Framework\TestCase;
+use Psr\EventDispatcher\EventDispatcherInterface as PsrEventDispatcherInterface;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\Envelope;
@@ -135,7 +136,7 @@ class IntegrationTest extends TestCase
         $thirdArgument = $workerClass->getConstructor()->getParameters()[2];
 
         $type = $thirdArgument->getType();
-        if ($type instanceof \ReflectionNamedType && EventDispatcherInterface::class === $type->getName()) {
+        if ($type instanceof \ReflectionNamedType && (EventDispatcherInterface::class === $type->getName() || PsrEventDispatcherInterface::class === $type->getName())) {
             $worker = new Worker(['dummy_transport' => $this->transport], $messageBus, $eventDispatcher = new EventDispatcher());
         } else {
             $worker = new Worker(['dummy_transport' => $this->transport], $messageBus, [], $eventDispatcher = new EventDispatcher());
@@ -198,7 +199,7 @@ class IntegrationTest extends TestCase
         $thirdArgument = $workerClass->getConstructor()->getParameters()[2];
 
         $type = $thirdArgument->getType();
-        if ($type instanceof \ReflectionNamedType && EventDispatcherInterface::class === $type->getName()) {
+        if ($type instanceof \ReflectionNamedType && (EventDispatcherInterface::class === $type->getName() || PsrEventDispatcherInterface::class === $type->getName())) {
             $worker = new Worker([$this->transport], new MessageBus(), $eventDispatcher = new EventDispatcher());
         } else {
             $worker = new Worker([$this->transport], new MessageBus(), [], $eventDispatcher = new EventDispatcher());

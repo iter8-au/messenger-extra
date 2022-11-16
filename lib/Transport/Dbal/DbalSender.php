@@ -99,14 +99,22 @@ class DbalSender implements SenderInterface
                 $uniqKey = sha1($uniqKey);
             }
 
-            $expr = $this->connection->createExpressionBuilder();
+            // DBAL 2.13 support
+            if (method_exists($this->connection, 'getExpressionBuilder') && !method_exists($this->connection, 'createExpressionBuilder')) {
+                $expr = $this->connection->getExpressionBuilder();
+                $executeQueryMethodName = 'execute';
+            } else {
+                // DBAL 3.1 deprecates getExpressionBuilder and says to use createExpressionBuilder instead.
+                $expr = $this->connection->createExpressionBuilder();
+                $executeQueryMethodName = 'executeQuery';
+            }
             $result = $this->connection->createQueryBuilder()
                 ->select('id')
                 ->from($this->tableName)
                 ->where($expr->eq('uniq_key', ':uniq_key'))
                 ->andWhere($expr->isNull('delivery_id'))
                 ->setParameter('uniq_key', $uniqKey)
-                ->executeQuery()
+                ->$executeQueryMethodName()
                 ->fetchOne();
 
             if ($result !== false) {

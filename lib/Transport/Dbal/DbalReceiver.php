@@ -119,11 +119,17 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
      */
     public function all(?int $limit = null): iterable
     {
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeQuery')) {
+            $executeQueryMethodName = 'execute';
+        } else {
+            $executeQueryMethodName = 'executeQuery';
+        }
+
         $result = $this->connection->createQueryBuilder()
             ->select('body', 'headers', 'id')
             ->from($this->tableName)
             ->setMaxResults($limit)
-            ->executeQuery();
+            ->$executeQueryMethodName();
 
         while (true) {
             /** @phpstan-var array{body: string, headers: string, id: string|resource}|false $row */
@@ -147,13 +153,19 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
             $id = hex2bin($id);
         }
 
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeQuery')) {
+            $executeQueryMethodName = 'execute';
+        } else {
+            $executeQueryMethodName = 'executeQuery';
+        }
+
         $result = $this->connection->createQueryBuilder()
             ->select('body', 'headers', 'id')
             ->from($this->tableName)
             ->andWhere('id = :identifier')
             ->setParameter('identifier', $id, ParameterType::BINARY)
             ->setMaxResults(1)
-            ->executeQuery();
+            ->$executeQueryMethodName();
 
         /** @phpstan-var array{body: string, headers: string, id: string|resource}|false $deliveredMessage */
         $deliveredMessage = $result->fetchAssociative();
@@ -168,7 +180,13 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
             ->from($this->tableName)
             ->setMaxResults(1);
 
-        return (int) $queryBuilder->executeQuery()->fetchOne();
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeQuery')) {
+            $executeQueryMethodName = 'execute';
+        } else {
+            $executeQueryMethodName = 'executeQuery';
+        }
+
+        return (int) $queryBuilder->$executeQueryMethodName()->fetchOne();
     }
 
     /**
@@ -194,10 +212,22 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
      */
     private function fetchMessage(): ?Envelope
     {
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeQuery')) {
+            $executeQueryMethodName = 'execute';
+        } else {
+            $executeQueryMethodName = 'executeQuery';
+        }
+
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeStatement')) {
+            $executeStatementMethodName = 'execute';
+        } else {
+            $executeStatementMethodName = 'executeStatement';
+        }
+
         $deliveryId = $this->codec->encodeBinary(Uuid::uuid4());
         $result = $this->select
             ->setParameter('delayedUntil', new DateTimeImmutable(), Types::DATETIMETZ_IMMUTABLE)
-            ->executeQuery()
+            ->$executeQueryMethodName()
             ->fetchAssociative();
 
         if (! $result) {
@@ -214,7 +244,7 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
             ->setParameter('redeliverAfter', new DateTimeImmutable('+5 minutes'), Types::DATETIMETZ_IMMUTABLE)
             ->setParameter('messageId', $id, ParameterType::BINARY);
 
-        if ($this->update->executeStatement()) {
+        if ($this->update->$executeStatementMethodName()) {
             /** @phpstan-var array{body: string, headers: string, id: string|resource, time_to_live: string}|false $deliveredMessage */
             $deliveredMessage = $this->connection->createQueryBuilder()
                 ->select('body', 'headers', 'id', 'time_to_live')
@@ -222,7 +252,7 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
                 ->andWhere('delivery_id = :deliveryId')
                 ->setParameter('deliveryId', $deliveryId, ParameterType::BINARY)
                 ->setMaxResults(1)
-                ->executeQuery()
+                ->$executeQueryMethodName()
                 ->fetchAssociative();
 
             // the message has been removed by a 3rd party, such as truncate operation.
@@ -252,6 +282,13 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
             return;
         }
 
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeQuery')) {
+            $executeStatementMethodName = 'execute';
+        } else {
+            $executeStatementMethodName = 'executeStatement';
+        }
+        dump($executeStatementMethodName);
+
         $this->connection->createQueryBuilder()
             ->update($this->tableName)
             ->set('delivery_id', ':deliveryId')
@@ -259,7 +296,7 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
             ->andWhere('delivery_id IS NOT NULL')
             ->setParameter('now', new DateTimeImmutable(), Types::DATETIMETZ_IMMUTABLE)
             ->setParameter('deliveryId', null)
-            ->executeStatement();
+            ->$executeStatementMethodName();
 
         $this->redeliverMessagesLastExecutedAt = microtime(true);
     }
@@ -275,12 +312,18 @@ class DbalReceiver implements ReceiverInterface, MessageCountAwareInterface, Lis
             return;
         }
 
+        if (method_exists(QueryBuilder::class, 'execute') && !method_exists(QueryBuilder::class, 'executeStatement')) {
+            $executeStatementMethodName = 'execute';
+        } else {
+            $executeStatementMethodName = 'executeStatement';
+        }
+
         $this->connection->createQueryBuilder()
             ->delete($this->tableName)
             ->andWhere('(time_to_live IS NOT NULL) AND (time_to_live < :now)')
             ->andWhere('delivery_id IS NULL')
             ->setParameter('now', new DateTimeImmutable(), Types::DATETIMETZ_IMMUTABLE)
-            ->executeStatement();
+            ->$executeStatementMethodName();
 
         $this->removeExpiredMessagesLastExecutedAt = microtime(true);
     }
